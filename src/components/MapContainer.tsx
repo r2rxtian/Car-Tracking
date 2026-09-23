@@ -73,6 +73,7 @@ export function MapContainer({ vehicle }: { vehicle: VehicleState }) {
   const mapRef = useRef<L.Map | null>(null)
   const markerRef = useRef<L.Marker | null>(null)
   const trailRef = useRef<L.Polyline | null>(null)
+  const previousStatusRef = useRef(vehicle.status)
   const [viewMode, setViewMode] = useState<ViewMode>('overview')
   const point = vehicle.currentLocation
 
@@ -90,15 +91,19 @@ export function MapContainer({ vehicle }: { vehicle: VehicleState }) {
       attributionControl: false,
     })
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      subdomains: 'abcd',
-      maxZoom: 20,
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
       bounds: PHILIPPINES_BOUNDS,
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
+      className: 'dark-osm-tiles',
+      attribution: '&copy; OpenStreetMap contributors',
     }).addTo(map)
 
+    L.control.attribution({ position: 'bottomright', prefix: false }).addTo(map)
+
     trailRef.current = L.polyline([], { className: 'vehicle-trail', color: '#f6b94a', weight: 4, opacity: 0.85, lineCap: 'round', lineJoin: 'round' }).addTo(map)
-    markerRef.current = L.marker([point.lat, point.lng], { icon: vehicleIcon(point.heading), zIndexOffset: 1000 }).addTo(map)
+    if (vehicle.status !== 'offline') {
+      markerRef.current = L.marker([point.lat, point.lng], { icon: vehicleIcon(point.heading), zIndexOffset: 1000 }).addTo(map)
+    }
     mapRef.current = map
 
     return () => {
@@ -110,18 +115,41 @@ export function MapContainer({ vehicle }: { vehicle: VehicleState }) {
   }, [])
 
   useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (vehicle.status === 'offline') {
+      if (markerRef.current) map.removeLayer(markerRef.current)
+      markerRef.current = null
+      trailRef.current?.setLatLngs([])
+      previousStatusRef.current = vehicle.status
+      return
+    }
+
+    if (!markerRef.current) {
+      markerRef.current = L.marker([point.lat, point.lng], {
+        icon: vehicleIcon(point.heading),
+        zIndexOffset: 1000,
+      }).addTo(map)
+    }
+
     const marker = markerRef.current
     marker?.setLatLng([point.lat, point.lng])
     const markerGraphic = marker?.getElement()?.querySelector<HTMLElement>('.vehicle-icon-inner')
     if (markerGraphic) markerGraphic.style.transform = `rotate(${point.heading}deg)`
     trailRef.current?.setLatLngs(vehicle.history.map(({ lat, lng }) => [lat, lng]))
 
+    if (previousStatusRef.current === 'offline' && viewMode === 'overview') {
+      map.setView([point.lat, point.lng], 14, { animate: true, duration: 1.2 })
+    }
+    previousStatusRef.current = vehicle.status
+
     if (viewMode === 'follow') {
       // Center slightly ahead of the vehicle so it rests in the lower third.
       const cameraTarget = destinationPoint(point.lat, point.lng, point.heading, 0.085)
       mapRef.current?.panTo(cameraTarget, { animate: true, duration: 1.8, easeLinearity: 0.16 })
     }
-  }, [point, vehicle.history, viewMode])
+  }, [point, vehicle.history, vehicle.status, viewMode])
 
   useEffect(() => {
     const map = mapRef.current

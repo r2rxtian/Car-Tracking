@@ -1,5 +1,5 @@
 import type { Server } from 'socket.io'
-import type { ClientToServerEvents, LocationPoint, ServerToClientEvents, VehicleState } from './types.js'
+import type { ClientToServerEvents, LocationPoint, LocationReading, ServerToClientEvents, VehicleState } from './types.js'
 
 const UPDATE_INTERVAL_MS = 2_000
 const MAX_HISTORY_POINTS = 120
@@ -40,12 +40,13 @@ export class TrackingService {
   private routeIndex = 0
   private direction: 1 | -1 = 1
   private timer?: NodeJS.Timeout
+  private receivingRealGps = false
 
   constructor(private readonly io: Server<ClientToServerEvents, ServerToClientEvents>) {
-    const initialPoint = createPoint(0, 1)
+    const initialPoint = { ...createPoint(0, 1), speed: 0 }
     this.vehicles.set(VEHICLE_ID, {
       id: VEHICLE_ID,
-      status: 'active',
+      status: 'offline',
       currentLocation: initialPoint,
       history: [initialPoint],
     })
@@ -69,7 +70,51 @@ export class TrackingService {
     return Array.from(this.vehicles.values())
   }
 
+  ingestLocation(reading: LocationReading) {
+    if (!this.isValidReading(reading)) return false
+    const previous = this.vehicles.get(reading.vehicleId)
+    if (!previous) return false
+
+    this.receivingRealGps = true
+    const previousPoint = previous.currentLocation
+    const heading = reading.heading ?? bearingBetween(
+      [previousPoint.lat, previousPoint.lng],
+      [reading.lat, reading.lng],
+    )
+    const nextPoint: LocationPoint = {
+      lat: reading.lat,
+      lng: reading.lng,
+      heading: Number.isFinite(heading) ? Math.round(heading) : previousPoint.heading,
+      speed: Math.max(0, Math.round(reading.speed ?? 0)),
+      timestamp: reading.timestamp,
+    }
+    const nextVehicle: VehicleState = {
+      ...previous,
+      status: nextPoint.speed < 2 ? 'idle' : 'active',
+      currentLocation: nextPoint,
+      history: [...previous.history, nextPoint].slice(-MAX_HISTORY_POINTS),
+    }
+    this.vehicles.set(reading.vehicleId, nextVehicle)
+    this.io.to(`vehicle:${reading.vehicleId}`).emit('vehicle:update', nextVehicle)
+    return true
+  }
+
+  private isValidReading(reading: LocationReading) {
+    return reading.vehicleId === VEHICLE_ID
+      && Number.isFinite(reading.lat)
+      && Number.isFinite(reading.lng)
+      && reading.lat >= 4.5 && reading.lat <= 21.5
+      && reading.lng >= 116.5 && reading.lng <= 127
+      && Number.isFinite(reading.accuracy)
+      && reading.accuracy > 0 && reading.accuracy <= 500
+      && Number.isFinite(reading.timestamp)
+      && Math.abs(Date.now() - reading.timestamp) < 60_000
+      && (reading.speed === null || (Number.isFinite(reading.speed) && reading.speed >= 0 && reading.speed <= 300))
+      && (reading.heading === null || (Number.isFinite(reading.heading) && reading.heading >= 0 && reading.heading <= 360))
+  }
+
   private advanceVehicle() {
+    if (this.receivingRealGps) return
     if (this.routeIndex >= ROUTE.length - 1) this.direction = -1
     if (this.routeIndex <= 0) this.direction = 1
     this.routeIndex += this.direction
@@ -81,6 +126,7 @@ export class TrackingService {
 
     const nextVehicle: VehicleState = {
       ...previous,
+      status: 'active',
       currentLocation: nextPoint,
       history: [...previous.history, nextPoint].slice(-MAX_HISTORY_POINTS),
     }

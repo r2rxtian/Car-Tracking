@@ -7,6 +7,7 @@ import type { ClientToServerEvents, ServerToClientEvents } from './types.js'
 
 const PORT = Number(process.env.PORT ?? 3001)
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? 'http://localhost:5173'
+const SIMULATOR_ENABLED = process.env.ENABLE_SIMULATOR === 'true'
 
 const app = express()
 app.use(cors({ origin: CLIENT_ORIGIN }))
@@ -39,11 +40,16 @@ io.on('connection', (socket) => {
     socket.join(`vehicle:${vehicleId}`)
     socket.emit('vehicle:update', vehicle)
   })
+
+  socket.on('vehicle:location', (reading) => {
+    if (tracking.ingestLocation(reading)) socket.emit('location:accepted', reading.timestamp)
+  })
 })
 
 httpServer.listen(PORT, () => {
-  tracking.start()
+  if (SIMULATOR_ENABLED) tracking.start()
   console.log(`Tracking API listening on http://localhost:${PORT}`)
+  console.log(`GPS simulator: ${SIMULATOR_ENABLED ? 'enabled' : 'disabled'}`)
 })
 
 function shutdown() {

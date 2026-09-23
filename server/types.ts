@@ -15,8 +15,20 @@ export interface VehicleState {
 
 export interface ServerToClientEvents {
   'vehicle:update': (vehicle: VehicleState) => void
+  'location:accepted': (timestamp: number) => void
 }
 
 export interface ClientToServerEvents {
   'vehicle:subscribe': (vehicleId: string) => void
+  'vehicle:location': (reading: LocationReading) => void
+}
+
+export interface LocationReading {
+  vehicleId: string
+  lat: number
+  lng: number
+  speed: number | null
+  heading: number | null
+  accuracy: number
+  timestamp: number
 }

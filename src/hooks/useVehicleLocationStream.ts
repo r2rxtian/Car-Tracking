@@ -3,7 +3,7 @@ import { io } from 'socket.io-client'
 import type { VehicleState } from '../types/tracking'
 
 const VEHICLE_ID = 'NCR-8421-X'
-const TRACKING_SERVER_URL = import.meta.env.VITE_TRACKING_SERVER_URL ?? 'http://localhost:3001'
+const TRACKING_SERVER_URL = import.meta.env.VITE_TRACKING_SERVER_URL || undefined
 
 const initialLocation = {
   lat: 14.6511,
