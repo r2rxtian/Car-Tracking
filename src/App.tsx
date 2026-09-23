@@ -1,6 +1,6 @@
 import { Bell, LocateFixed, ShieldCheck } from 'lucide-react'
 import { MapContainer } from './components/MapContainer'
-import { useMockLocationStream } from './hooks/useMockLocationStream'
+import { useVehicleLocationStream } from './hooks/useVehicleLocationStream'
 
 function Header() {
   return (
@@ -22,6 +22,6 @@ function Header() {
 }
 
 export default function App() {
-  const vehicle = useMockLocationStream()
+  const vehicle = useVehicleLocationStream()
   return <div className="flex h-dvh flex-col bg-ops-black"><Header /><MapContainer vehicle={vehicle} /></div>
 }

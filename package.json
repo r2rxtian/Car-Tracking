@@ -4,8 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -k -n API,WEB -c yellow,green \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:client": "vite",
+    "dev:server": "tsx watch server/index.ts",
     "build": "tsc -b && vite build",
+    "build:server": "tsc -p server/tsconfig.json",
+    "start:server": "node server/dist/index.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -14,14 +18,21 @@
     "leaflet": "latest",
     "lucide-react": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "cors": "latest",
+    "express": "latest",
+    "socket.io": "latest",
+    "socket.io-client": "latest"
   },
   "devDependencies": {
     "@eslint/js": "latest",
     "@types/leaflet": "latest",
+    "@types/cors": "latest",
+    "@types/express": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "autoprefixer": "latest",
+    "concurrently": "latest",
     "eslint": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
@@ -30,6 +41,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "latest",
     "typescript-eslint": "latest",
+    "tsx": "latest",
     "vite": "latest"
   }
 }
